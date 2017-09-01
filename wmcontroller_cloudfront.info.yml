@@ -1,0 +1,7 @@
+name: wmcontroller_cloudfront
+type: module
+description: A CloudFront invalidator for WmController
+core: 8.x
+package: Wieni
+dependencies:
+  - wmcontroller

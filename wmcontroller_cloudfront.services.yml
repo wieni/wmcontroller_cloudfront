@@ -1,0 +1,10 @@
+parameters:
+    wmcontroller.cache.cloudfront:
+        distributionId: ''
+        accessKey: ''
+        secret: ''
+
+services:
+    wmcontroller.cache.purger.cloudfront:
+        class: Drupal\wmcontroller_cloudfront\CloudFront
+        arguments: ['%wmcontroller.cache.cloudfront%']
