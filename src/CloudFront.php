@@ -10,7 +10,7 @@ use Drupal\wmcontroller\Service\Cache\Purger\PurgerInterface;
 class CloudFront implements PurgerInterface
 {
     /** @var array */
-    private $config;
+    protected $config;
 
     public function __construct(array $config)
     {
@@ -28,7 +28,7 @@ class CloudFront implements PurgerInterface
         $this->purgeCDN(['/', '/*']);
     }
 
-    private function invalidate(array $items)
+    protected function invalidate(array $items)
     {
         $paths = array_map([$this, 'getPath'], $items);
 
@@ -39,12 +39,12 @@ class CloudFront implements PurgerInterface
         $this->purgeCDN($paths);
     }
 
-    private function getPath(Cache $item)
+    protected function getPath(Cache $item)
     {
         return parse_url($item->getUri(), PHP_URL_PATH);
     }
 
-    private function purgeCDN(array $paths)
+    protected function purgeCDN(array $paths)
     {
         $distributionId = $this->config['distributionId'];
         $accessKey = $this->config['accessKey'];
