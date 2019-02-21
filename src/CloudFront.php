@@ -2,71 +2,97 @@
 
 namespace Drupal\wmcontroller_cloudfront;
 
-use Aws\Credentials\Credentials;
-use Aws\Sdk;
 use Drupal\wmcontroller\Entity\Cache;
-use Drupal\wmcontroller\Service\Cache\Purger\PurgerInterface;
+use Drupal\wmcontroller\Service\Cache\Storage\StorageInterface;
 
-class CloudFront implements PurgerInterface
+class CloudFront implements StorageInterface
 {
-    /** @var array */
-    protected $config;
+    /** @var \Drupal\wmcontroller_cloudfront\CloudFrontInvalidator */
+    protected $invalidator;
+    /** @var \Drupal\wmcontroller\Service\Cache\Storage\StorageInterface */
+    protected $storage;
 
-    public function __construct(array $config)
-    {
-        $this->config = $config;
+    protected $concurrent = 50;
+    protected $flushing = false;
+
+    public function __construct(
+        CloudFrontInvalidator $invalidator,
+        StorageInterface $storage
+    ) {
+        $this->invalidator = $invalidator;
+        $this->storage = $storage;
     }
 
-    public function purge(array $items)
+    public function remove(array $ids)
     {
-        $this->invalidate($items);
-        return true;
+        $this->invalidate($ids);
+        $this->storage->remove($ids);
     }
 
     public function flush()
     {
-        $this->purgeCDN(['/', '/*']);
+        // Flag that we are flushing. It's possible that the backend storage
+        // calls ::remove() a bunch of times to clear. We don't want to be
+        // invalidating those calls. When all is well and done we'll do a
+        // mass-invalidation of all pages with "/*"
+        $this->flushing = true;
+
+        $this->storage->flush();
+
+        $this->flushing = false;
+
+        $this->invalidator->invalidate(['/*']);
     }
 
-    protected function invalidate(array $items)
+    protected function invalidate(array $ids)
     {
-        $paths = array_map([$this, 'getPath'], $items);
-
-        if (!$paths) {
+        // If we are flushing, don't invalidate. Once we're done flushing we'll
+        // do a single mass-invalidation. See the ::flush() method.
+        if ($this->flushing) {
             return;
         }
 
-        $this->purgeCDN($paths);
+        // Invalidate in a foreach loop so we can leverage generators and
+        // play nice with our memory when invalidating a whole bunch of items.
+        //
+        // Even though CloudFront does max 3000 concurrent invalidations..
+        $paths = [];
+        foreach ($this->storage->loadMultiple($ids, false) as $item) {
+            $paths[] = parse_url($item->getUri(), PHP_URL_PATH);
+
+            if (count($paths) === $this->concurrent) {
+                $this->invalidator->invalidate($paths);
+                $paths = [];
+            }
+        }
+
+        if ($paths) {
+            $this->invalidator->invalidate($paths);
+        }
     }
 
-    protected function getPath(Cache $item)
+    public function getExpired($amount)
     {
-        return parse_url($item->getUri(), PHP_URL_PATH);
+        return $this->storage->getExpired($amount);
     }
 
-    protected function purgeCDN(array $paths)
+    public function load($id, $includeBody = true)
     {
-        $distributionId = $this->config['distributionId'];
-        $accessKey = $this->config['accessKey'];
-        $secret = $this->config['secret'];
+        return $this->storage->load($id, $includeBody);
+    }
 
-        $client = (new Sdk([
-            'region' => 'us-east-1',
-            'version' => '2017-03-25',
-            'credentials' => new Credentials($accessKey, $secret)
-        ]))->createCloudFront();
+    public function loadMultiple(array $ids, $includeBody): \Iterator
+    {
+        return $this->storage->loadMultiple($ids, $includeBody);
+    }
 
-        $result = $client->createInvalidation([
-            'DistributionId' => $distributionId,
-            'InvalidationBatch' => [
-                'CallerReference' => sha1(uniqid('', true) . '-' . mt_rand(0, 10000000)),
-                'Paths' => [
-                    'Items' => $paths,
-                    'Quantity' => count($paths),
-                ],
-            ],
-        ])->toArray();
+    public function set(Cache $item, array $tags)
+    {
+        return $this->storage->set($item, $tags);
+    }
 
-        return $result;
+    public function getByTags(array $tags)
+    {
+        return $this->storage->getByTags($tags);
     }
 }
