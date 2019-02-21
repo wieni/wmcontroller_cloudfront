@@ -13,7 +13,7 @@ class CloudFront implements StorageInterface
     protected $storage;
 
     protected $concurrent = 50;
-    protected $flushing = false;
+    protected $killSwitch = false;
 
     public function __construct(
         CloudFrontInvalidator $invalidator,
@@ -31,24 +31,33 @@ class CloudFront implements StorageInterface
 
     public function flush()
     {
-        // Flag that we are flushing. It's possible that the backend storage
+        // Flag the killSwitch. It's possible that the backend storage
         // calls ::remove() a bunch of times to clear. We don't want to be
         // invalidating those calls. When all is well and done we'll do a
         // mass-invalidation of all pages with "/*"
-        $this->flushing = true;
+        $this->killSwitch = true;
 
         $this->storage->flush();
 
-        $this->flushing = false;
+        $this->killSwitch = false;
 
         $this->invalidator->invalidate(['/*']);
     }
 
+    public function removeExpired($amount)
+    {
+        // Flag the killSwitch. We don't want to invalidate expired paths as
+        // the path is most likely also expired at the CDN.
+        $this->killSwitch = true;
+
+        $this->storage->removeExpired($amount);
+
+        $this->killSwitch = false;
+    }
+
     protected function invalidate(array $ids)
     {
-        // If we are flushing, don't invalidate. Once we're done flushing we'll
-        // do a single mass-invalidation. See the ::flush() method.
-        if ($this->flushing) {
+        if ($this->killSwitch) {
             return;
         }
 
@@ -71,17 +80,12 @@ class CloudFront implements StorageInterface
         }
     }
 
-    public function getExpired($amount)
-    {
-        return $this->storage->getExpired($amount);
-    }
-
     public function load($id, $includeBody = true)
     {
         return $this->storage->load($id, $includeBody);
     }
 
-    public function loadMultiple(array $ids, $includeBody): \Iterator
+    public function loadMultiple(array $ids, $includeBody = true): \Iterator
     {
         return $this->storage->loadMultiple($ids, $includeBody);
     }
