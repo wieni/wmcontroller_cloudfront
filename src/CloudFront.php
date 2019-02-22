@@ -2,71 +2,85 @@
 
 namespace Drupal\wmcontroller_cloudfront;
 
-use Aws\Credentials\Credentials;
-use Aws\Sdk;
 use Drupal\wmcontroller\Entity\Cache;
-use Drupal\wmcontroller\Service\Cache\Purger\PurgerInterface;
+use Drupal\wmcontroller\Service\Cache\Storage\StorageInterface;
 
-class CloudFront implements PurgerInterface
+class CloudFront implements StorageInterface
 {
-    /** @var array */
-    protected $config;
+    /** @var \Drupal\wmcontroller_cloudfront\CloudFrontInvalidator */
+    protected $invalidator;
+    /** @var \Drupal\wmcontroller\Service\Cache\Storage\StorageInterface */
+    protected $storage;
 
-    public function __construct(array $config)
-    {
-        $this->config = $config;
+    protected $concurrent = 50;
+
+    public function __construct(
+        CloudFrontInvalidator $invalidator,
+        StorageInterface $storage
+    ) {
+        $this->invalidator = $invalidator;
+        $this->storage = $storage;
     }
 
-    public function purge(array $items)
+    public function remove(array $ids)
     {
-        $this->invalidate($items);
-        return true;
+        $this->invalidate($ids);
+        $this->storage->remove($ids);
     }
 
     public function flush()
     {
-        $this->purgeCDN(['/', '/*']);
+        $this->storage->flush();
+        $this->invalidator->invalidate(['/*']);
     }
 
-    protected function invalidate(array $items)
+    protected function invalidate(array $ids)
     {
-        $paths = array_map([$this, 'getPath'], $items);
+        // Invalidate in a foreach loop so we can leverage generators and
+        // play nice with our memory when invalidating a whole bunch of items.
+        //
+        // Even though CloudFront does max 3000 concurrent invalidations..
+        $paths = [];
+        foreach ($this->storage->loadMultiple($ids, false) as $item) {
+            /** @var Cache $item */
+            if ($item->getExpiry() < time() + 60) {
+                continue;
+            }
+            $paths[] = parse_url($item->getUri(), PHP_URL_PATH);
 
-        if (!$paths) {
-            return;
+            if (count($paths) === $this->concurrent) {
+                $this->invalidator->invalidate($paths);
+                $paths = [];
+            }
         }
 
-        $this->purgeCDN($paths);
+        if ($paths) {
+            $this->invalidator->invalidate($paths);
+        }
     }
 
-    protected function getPath(Cache $item)
+    public function load($id, $includeBody = true)
     {
-        return parse_url($item->getUri(), PHP_URL_PATH);
+        return $this->storage->load($id, $includeBody);
     }
 
-    protected function purgeCDN(array $paths)
+    public function loadMultiple(array $ids, $includeBody = true): \Iterator
     {
-        $distributionId = $this->config['distributionId'];
-        $accessKey = $this->config['accessKey'];
-        $secret = $this->config['secret'];
+        return $this->storage->loadMultiple($ids, $includeBody);
+    }
 
-        $client = (new Sdk([
-            'region' => 'us-east-1',
-            'version' => '2017-03-25',
-            'credentials' => new Credentials($accessKey, $secret)
-        ]))->createCloudFront();
+    public function set(Cache $item, array $tags)
+    {
+        return $this->storage->set($item, $tags);
+    }
 
-        $result = $client->createInvalidation([
-            'DistributionId' => $distributionId,
-            'InvalidationBatch' => [
-                'CallerReference' => sha1(uniqid('', true) . '-' . mt_rand(0, 10000000)),
-                'Paths' => [
-                    'Items' => $paths,
-                    'Quantity' => count($paths),
-                ],
-            ],
-        ])->toArray();
+    public function getByTags(array $tags)
+    {
+        return $this->storage->getByTags($tags);
+    }
 
-        return $result;
+    public function getExpired($amount)
+    {
+        $this->storage->getExpired($amount);
     }
 }

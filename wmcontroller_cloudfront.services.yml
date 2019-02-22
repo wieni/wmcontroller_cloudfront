@@ -4,7 +4,23 @@ parameters:
         accessKey: ''
         secret: ''
 
+    # Backend storage responsible for keeping track of tags and cache entries
+    wmcontroller.cache.cloudfront.backend.storage: wmcontroller.cache.storage.mysql
+
 services:
-    wmcontroller.cache.purger.cloudfront:
-        class: Drupal\wmcontroller_cloudfront\CloudFront
+    wmcontroller.cache.invalidator.cloudfront:
+        class: Drupal\wmcontroller_cloudfront\CloudFrontInvalidator
         arguments: ['%wmcontroller.cache.cloudfront%']
+
+    wmcontroller.cache.cloudfront.backend.storage:
+        class: Drupal\wmcontroller\Service\Cache\Storage\StorageInterface
+        factory: Drupal\wmcontroller\Service\Factory::create
+        arguments:
+            - '@service_container'
+            - '%wmcontroller.cache.cloudfront.backend.storage%'
+
+    wmcontroller.cache.storage.cloudfront:
+        class: Drupal\wmcontroller_cloudfront\CloudFront
+        arguments:
+            - '@wmcontroller.cache.invalidator.cloudfront'
+            - '@wmcontroller.cache.cloudfront.backend.storage'

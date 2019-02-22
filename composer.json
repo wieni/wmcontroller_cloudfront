@@ -12,6 +12,7 @@
     "prefer-stable": true,
     "type": "drupal-module",
     "require": {
-        "aws/aws-sdk-php": "^3.35"
+        "aws/aws-sdk-php": "^3.35",
+        "wieni/wmcontroller": "0.8.*"
     }
 }
