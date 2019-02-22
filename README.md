@@ -18,4 +18,8 @@ wmcontroller.cache.cloudfront:
     secret: ''
 
 wmcontroller.cache.purger: wmcontroller.cache.purger.cloudfront
+
+# This storage only invalidates at CloudFront. It does not store anything
+# and requires another storage to function. By default it uses the database storage.
+wmcontroller.cache.cloudfront.backend.storage: wmcontroller.cache.storage.mysql
 ```
