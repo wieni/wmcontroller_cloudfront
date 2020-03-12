@@ -1,7 +1,9 @@
 name: wmcontroller_cloudfront
 type: module
-description: A CloudFront invalidator for WmController
+description: An Amazon CloudFront invalidator for wmcontroller
 core: 8.x
+core_version_requirement: ^8 || ^9
+php: 7.1
 package: Wieni
 dependencies:
-  - wmcontroller
+    - wmcontroller

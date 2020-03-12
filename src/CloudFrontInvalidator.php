@@ -40,7 +40,7 @@ class CloudFrontInvalidator
         $client = (new Sdk([
             'region' => 'us-east-1',
             'version' => '2017-03-25',
-            'credentials' => new Credentials($accessKey, $secret)
+            'credentials' => new Credentials($accessKey, $secret),
         ]))->createCloudFront();
 
         // Todo: what if we are already invalidating >= 3000 paths and

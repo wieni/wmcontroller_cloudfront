@@ -7,9 +7,9 @@ use Drupal\wmcontroller\Service\Cache\Storage\StorageInterface;
 
 class CloudFront implements StorageInterface
 {
-    /** @var \Drupal\wmcontroller_cloudfront\CloudFrontInvalidator */
+    /** @var CloudFrontInvalidator */
     protected $invalidator;
-    /** @var \Drupal\wmcontroller\Service\Cache\Storage\StorageInterface */
+    /** @var StorageInterface */
     protected $storage;
 
     protected $concurrent = 50;
@@ -32,31 +32,6 @@ class CloudFront implements StorageInterface
     {
         $this->storage->flush();
         $this->invalidator->invalidate(['/*']);
-    }
-
-    protected function invalidate(array $ids)
-    {
-        // Invalidate in a foreach loop so we can leverage generators and
-        // play nice with our memory when invalidating a whole bunch of items.
-        //
-        // Even though CloudFront does max 3000 concurrent invalidations..
-        $paths = [];
-        foreach ($this->storage->loadMultiple($ids, false) as $item) {
-            /** @var Cache $item */
-            if ($item->getExpiry() < time() + 60) {
-                continue;
-            }
-            $paths[] = parse_url($item->getUri(), PHP_URL_PATH);
-
-            if (count($paths) === $this->concurrent) {
-                $this->invalidator->invalidate($paths);
-                $paths = [];
-            }
-        }
-
-        if ($paths) {
-            $this->invalidator->invalidate($paths);
-        }
     }
 
     public function load($id, $includeBody = true)
@@ -82,5 +57,30 @@ class CloudFront implements StorageInterface
     public function getExpired($amount)
     {
         $this->storage->getExpired($amount);
+    }
+
+    protected function invalidate(array $ids)
+    {
+        // Invalidate in a foreach loop so we can leverage generators and
+        // play nice with our memory when invalidating a whole bunch of items.
+        //
+        // Even though CloudFront does max 3000 concurrent invalidations..
+        $paths = [];
+        foreach ($this->storage->loadMultiple($ids, false) as $item) {
+            /** @var Cache $item */
+            if ($item->getExpiry() < time() + 60) {
+                continue;
+            }
+            $paths[] = parse_url($item->getUri(), PHP_URL_PATH);
+
+            if (count($paths) === $this->concurrent) {
+                $this->invalidator->invalidate($paths);
+                $paths = [];
+            }
+        }
+
+        if ($paths) {
+            $this->invalidator->invalidate($paths);
+        }
     }
 }

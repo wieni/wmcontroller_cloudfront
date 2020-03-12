@@ -1,6 +1,7 @@
 {
     "name": "wieni/wmcontroller_cloudfront",
-    "description": "A CloudFront invalidator for WmController",
+    "type": "drupal-module",
+    "description": "An Amazon CloudFront invalidator for wmcontroller",
     "license": "MIT",
     "authors": [
         {
@@ -8,11 +9,22 @@
             "email": "info@wieni.be"
         }
     ],
+    "require": {
+        "php": ">=7.1.0",
+        "aws/aws-sdk-php": "^3.35",
+        "drupal/core": "^8.0 || ^9.0",
+        "wieni/wmcontroller": ">=0.8 <0.10"
+    },
+    "require-dev": {
+        "ergebnis/composer-normalize": "^2.0",
+        "wieni/wmcodestyle": "^1.0"
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "type": "drupal-module",
-    "require": {
-        "aws/aws-sdk-php": "^3.35",
-        "wieni/wmcontroller": ">=0.8 <0.10"
+    "scripts": {
+        "coding-standards": [
+            "@composer normalize",
+            "php-cs-fixer fix --config=.php_cs.php"
+        ]
     }
 }
