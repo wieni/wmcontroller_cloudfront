@@ -24,7 +24,7 @@ parameters:
         accessKey: ''
         secret: ''
     
-    wmcontroller.cache.purger: wmcontroller.cache.purger.cloudfront
+    wmcontroller.cache.storage: wmcontroller.cache.storage.cloudfront
     
     # This storage only invalidates at CloudFront. It does not store anything
     # and requires another storage to function. By default it uses the database storage.
