@@ -14,7 +14,7 @@ services:
 
     wmcontroller.cache.cloudfront.backend.storage:
         class: Drupal\wmcontroller\Service\Cache\Storage\StorageInterface
-        factory: Drupal\wmcontroller\Service\Factory::create
+        factory: Drupal\wmcontroller\Service\ServiceFactory::create
         arguments:
             - '@service_container'
             - '%wmcontroller.cache.cloudfront.backend.storage%'
