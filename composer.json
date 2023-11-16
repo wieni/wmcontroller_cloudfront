@@ -12,8 +12,8 @@
     "require": {
         "php": "^8.0",
         "aws/aws-sdk-php": "^3.35",
-        "drupal/core": "^9.1",
-        "wieni/wmcontroller": "^1.0"
+        "drupal/core": "^9.1 || ^10",
+        "wieni/wmcontroller": "dev-feature/drupal-10"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.0",
